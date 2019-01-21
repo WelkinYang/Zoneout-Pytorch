@@ -73,7 +73,8 @@ class ZoneoutRNN(nn.Module):
                 backward_new_state = backward_new_h
                 forward_output = forward_new_h
                 backward_output = backward_new_h
-            return (forward_output, backward_output), (forward_new_state, backward_new_state)
+                output = torch.cat(forward_output, backward_output, 1)
+            return output, (forward_new_state, backward_new_state)
         else:
             forward_output, forward_new_state = self.forward_cell(forward_input, forward_state)
             if isinstance(self.cell, nn.LSTMCell):
@@ -100,5 +101,5 @@ class ZoneoutRNN(nn.Module):
 
                 forward_new_state = forward_new_h
                 forward_output = forward_new_h
-            return (forward_output, forward_new_state)
+            return forward_output, forward_new_state
 
