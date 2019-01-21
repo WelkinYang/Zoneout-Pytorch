@@ -73,7 +73,7 @@ class ZoneoutRNN(nn.Module):
                 backward_new_state = backward_new_h
                 forward_output = forward_new_h
                 backward_output = backward_new_h
-                output = torch.cat(forward_output, backward_output, 1)
+            output = torch.cat(forward_output, backward_output, 1)
             return output, (forward_new_state, backward_new_state)
         else:
             forward_output, forward_new_state = self.forward_cell(forward_input, forward_state)
