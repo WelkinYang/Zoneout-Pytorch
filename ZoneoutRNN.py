@@ -1,3 +1,5 @@
+import torch
+import torch.nn as nn
 class ZoneoutRNN(nn.Module):
     def __init__(self, cell, zoneout_prob, bidrectional=True):
         super(ZoneoutRNN, self).__init__()
