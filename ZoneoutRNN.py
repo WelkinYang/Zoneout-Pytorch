@@ -15,7 +15,7 @@ class ZoneoutRNN(nn.Module):
         if isinstance(cell, nn.LSTMCell):
             if not isinstance(zoneout_prob, tuple):
                 raise TypeError("The LSTM zoneout_prob must be a tuple!")
-        elif isinstance(cell, nn.GRU):
+        elif isinstance(cell, nn.GRUCell):
             if not isinstance(zoneout_prob, float):
                 raise TypeError("The LSTM zoneout_prob must be a float number!")
 
