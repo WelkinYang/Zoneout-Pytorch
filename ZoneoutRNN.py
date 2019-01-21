@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import torch.functional as F
 class ZoneoutRNN(nn.Module):
     def __init__(self, forward_cell, backward_cell, zoneout_prob, bidrectional=True, dropout_rate=0.5):
         super(ZoneoutRNN, self).__init__()
