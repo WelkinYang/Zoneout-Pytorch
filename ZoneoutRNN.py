@@ -1,23 +1,26 @@
 import torch
 import torch.nn as nn
+
 class ZoneoutRNN(nn.Module):
-    def __init__(self, cell, zoneout_prob, bidrectional=True):
+    def __init__(self, forward_cell, backward_cell, zoneout_prob, bidrectional=True, dropout_rate=0.5):
         super(ZoneoutRNN, self).__init__()
-        self.forward_cell = cell
-        self.backward_cell = cell
+        self.forward_cell = forward_cell
+        self.backward_cell = backward_cell
         self.zoneout_prob = zoneout_prob
         self.bidrectional = bidrectional
+        self.dropout_rate = dropout_rate
 
-        if isinstance(cell, nn.RNNCell):
-            raise TypeError("The cell is a RNNCell!")
-        if not isinstance(cell, nn.RNNCellBase):
+        if not isinstance(forward_cell, nn.RNNCellBase):
             raise TypeError("The cell is not a LSTMCell or GRUCell!")
-        if isinstance(cell, nn.LSTMCell):
+        if isinstance(forward_cell, nn.LSTMCell):
             if not isinstance(zoneout_prob, tuple):
                 raise TypeError("The LSTM zoneout_prob must be a tuple!")
-        elif isinstance(cell, nn.GRUCell):
+        elif isinstance(forward_cell, nn.GRUCell):
             if not isinstance(zoneout_prob, float):
-                raise TypeError("The LSTM zoneout_prob must be a float number!")
+                raise TypeError("The GRU zoneout_prob must be a float number!")
+        elif isinstance(forward_cell, nn.RNNCell):
+            if not isinstance(zoneout_prob, float):
+                raise TypeError("The RNN zoneout_prob must be a float number!")
 
     @property
     def hidden_size(self):
@@ -26,10 +29,10 @@ class ZoneoutRNN(nn.Module):
     def input_size(self):
         return self.forward_cell.input_size
 
-    def forward(self, input, forward_state, backward_state):
+    def forward(self, forward_input, backward_input, forward_state, backward_state):
         if self.bidrectional == True:
-            forward_output, forward_new_state = self.forward_cell(input, forward_state)
-            backward_output, backward_new_state = self.backward_cell(input, backward_state)
+            forward_output, forward_new_state = self.forward_cell(forward_input, forward_state)
+            backward_output, backward_new_state = self.backward_cell(backward_input, backward_state)
             if isinstance(self.cell, nn.LSTMCell):
                 forward_h, forward_c = forward_state
                 forward_new_h, forward_new_c = forward_new_state
@@ -38,14 +41,14 @@ class ZoneoutRNN(nn.Module):
                 backward_new_h, backward_new_c = backward_new_state
                 zoneout_prob_c, zoneout_prob_h = self.zoneout_prob
 
-                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=hp.dropout_rate,
+                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=self.dropout_rate,
                                                                  training=self.training) + forward_h
-                forward_new_c = (1 - zoneout_prob_c) * F.dropout(forward_new_c, p=hp.dropout_rate,
+                forward_new_c = (1 - zoneout_prob_c) * F.dropout(forward_new_c, p=self.dropout_rate,
                                                                  training=self.training) + forward_c
 
-                backward_new_h = (1 - zoneout_prob_h) * F.dropout(backward_new_h, p=hp.dropout_rate,
+                backward_new_h = (1 - zoneout_prob_h) * F.dropout(backward_new_h, p=self.dropout_rate,
                                                                  training=self.training) + backward_h
-                backward_new_c = (1 - zoneout_prob_c) * F.dropout(backward_new_c, p=hp.dropout_rate,
+                backward_new_c = (1 - zoneout_prob_c) * F.dropout(backward_new_c, p=self.dropout_rate,
                                                                  training=self.training) + backward_c
 
                 forward_new_state = forward_new_h, forward_new_c
@@ -61,27 +64,27 @@ class ZoneoutRNN(nn.Module):
                 backward_new_h = backward_new_state
                 zoneout_prob_h = self.zoneout_prob
 
-                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=hp.dropout_rate,
+                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=self.dropout_rate,
                                                                  training=self.training) + forward_h
-                backward_new_h = (1 - zoneout_prob_h) * F.dropout(backward_new_h, p=hp.dropout_rate,
+                backward_new_h = (1 - zoneout_prob_h) * F.dropout(backward_new_h, p=self.dropout_rate,
                                                                   training=self.training) + backward_h
 
                 forward_new_state = forward_new_h
                 backward_new_state = backward_new_h
                 forward_output = forward_new_h
                 backward_output = backward_new_h
-            return forward_output, backward_output, forward_new_state, backward_new_state
+            return (forward_output, backward_output), (forward_new_state, backward_new_state)
         else:
-            forward_output, forward_new_state = self.forward_cell(input, forward_state)
+            forward_output, forward_new_state = self.forward_cell(forward_input, forward_state)
             if isinstance(self.cell, nn.LSTMCell):
                 forward_h, forward_c = forward_state
                 forward_new_h, forward_new_c = forward_new_state
 
                 zoneout_prob_c, zoneout_prob_h = self.zoneout_prob
 
-                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=hp.dropout_rate,
+                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=self.dropout_rate,
                                                                  training=self.training) + forward_h
-                forward_new_c = (1 - zoneout_prob_c) * F.dropout(forward_new_c, p=hp.dropout_rate,
+                forward_new_c = (1 - zoneout_prob_c) * F.dropout(forward_new_c, p=self.dropout_rate,
                                                                  training=self.training) + forward_c
                 forward_new_state = forward_new_h, forward_new_c
                 forward_output = forward_new_h
@@ -92,9 +95,10 @@ class ZoneoutRNN(nn.Module):
 
                 zoneout_prob_h = self.zoneout_prob
 
-                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=hp.dropout_rate,
+                forward_new_h = (1 - zoneout_prob_h) * F.dropout(forward_new_h, p=self.dropout_rate,
                                                                  training=self.training) + forward_h
 
                 forward_new_state = forward_new_h
                 forward_output = forward_new_h
-            return forward_output, forward_new_state
+            return (forward_output, forward_new_state)
+
