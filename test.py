@@ -1,3 +1,4 @@
+#Author: Heyang Xue from ASLP@http://lxie.npu-aslp.org/
 import torch
 from ZoneoutRNN import ZoneoutRNN
 import torch.nn as nn

@@ -1,3 +1,4 @@
+#Author: Heyang Xue from ASLP@http://lxie.npu-aslp.org/
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
