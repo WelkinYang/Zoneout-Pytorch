@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
+
 class ZoneoutRNN(nn.Module):
     def __init__(self, forward_cell, backward_cell, zoneout_prob, bidrectional=True, dropout_rate=0.5):
         super(ZoneoutRNN, self).__init__()
@@ -10,6 +11,9 @@ class ZoneoutRNN(nn.Module):
         self.bidrectional = bidrectional
         self.dropout_rate = dropout_rate
 
+        if self.bidrectional:
+            if self.forward_cell.hidden_size != self.backward_cell.hidden_size:
+                raise TypeError("The forward cell should be the same as backward!")
         if not isinstance(forward_cell, nn.RNNCellBase):
             raise TypeError("The cell is not a LSTMCell or GRUCell!")
         if isinstance(forward_cell, nn.LSTMCell):
@@ -31,9 +35,9 @@ class ZoneoutRNN(nn.Module):
 
     def forward(self, forward_input, backward_input, forward_state, backward_state):
         if self.bidrectional == True:
-            forward_output, forward_new_state = self.forward_cell(forward_input, forward_state)
-            backward_output, backward_new_state = self.backward_cell(backward_input, backward_state)
-            if isinstance(self.cell, nn.LSTMCell):
+            forward_new_state = self.forward_cell(forward_input, forward_state)
+            backward_new_state = self.backward_cell(backward_input, backward_state)
+            if isinstance(self.forward_cell, nn.LSTMCell):
                 forward_h, forward_c = forward_state
                 forward_new_h, forward_new_c = forward_new_state
 
@@ -51,8 +55,8 @@ class ZoneoutRNN(nn.Module):
                 backward_new_c = (1 - zoneout_prob_c) * F.dropout(backward_new_c, p=self.dropout_rate,
                                                                  training=self.training) + backward_c
 
-                forward_new_state = forward_new_h, forward_new_c
-                backward_new_state = backward_new_h, backward_new_c
+                forward_new_state = (forward_new_h, forward_new_c)
+                backward_new_state = (backward_new_h, backward_new_c)
                 forward_output = forward_new_h
                 backward_output = backward_new_h
 
@@ -73,11 +77,11 @@ class ZoneoutRNN(nn.Module):
                 backward_new_state = backward_new_h
                 forward_output = forward_new_h
                 backward_output = backward_new_h
-            output = torch.cat(forward_output, backward_output, 1)
-            return output, (forward_new_state, backward_new_state)
+
+            return forward_output, backward_output, forward_new_state, backward_new_state
         else:
-            forward_output, forward_new_state = self.forward_cell(forward_input, forward_state)
-            if isinstance(self.cell, nn.LSTMCell):
+            forward_new_state = self.forward_cell(forward_input, forward_state)
+            if isinstance(self.forward_cell, nn.LSTMCell):
                 forward_h, forward_c = forward_state
                 forward_new_h, forward_new_c = forward_new_state
 
@@ -87,7 +91,7 @@ class ZoneoutRNN(nn.Module):
                                                                  training=self.training) + forward_h
                 forward_new_c = (1 - zoneout_prob_c) * F.dropout(forward_new_c, p=self.dropout_rate,
                                                                  training=self.training) + forward_c
-                forward_new_state = forward_new_h, forward_new_c
+                forward_new_state = (forward_new_h, forward_new_c)
                 forward_output = forward_new_h
 
             else:
